@@ -6,10 +6,10 @@
 <title>SIM Swap Guard demo</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#5d6570; --line:#e2e5ea; --accent:#2457d6;
-          --allow:#137a3a; --step:#a35f00; --block:#b3261e; --review:#5b4bb7; }
+          --allow:#137a3a; --step:#a35f00; --block:#b3261e; --review:#5b4bb7; --on-accent:#fff; }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#111317; --card:#1a1d23; --ink:#e9ebef; --muted:#9aa2ad; --line:#2b3039; --accent:#7aa2ff;
-            --allow:#4cc27a; --step:#f0a640; --block:#ff7a70; --review:#a99bff; }
+            --allow:#4cc27a; --step:#f0a640; --block:#ff7a70; --review:#a99bff; --on-accent:#0b1020; }
   }
   * { box-sizing:border-box }
   body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif }
@@ -19,7 +19,7 @@
   h2 { font-size:15px; margin:0 0 12px }
   label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px }
   input, select { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font:inherit }
-  button { margin-top:14px; padding:9px 16px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer }
+  button { margin-top:14px; padding:9px 16px; border:0; border-radius:6px; background:var(--accent); color:var(--on-accent); font:inherit; font-weight:600; cursor:pointer }
   button:disabled { opacity:.45; cursor:not-allowed }
   .result { margin-top:14px; padding:10px 12px; border-radius:6px; border-left:4px solid; background:var(--bg); display:none }
   .result b { text-transform:uppercase; letter-spacing:.04em; font-size:12px }

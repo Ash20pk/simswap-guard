@@ -40,6 +40,8 @@ Open **http://localhost:3000** and try these numbers (password: `demo`):
 
 The numbers come from Ofcom's range reserved for TV and film, so none of them can belong to a real person.
 
+Port taken? Run `PORT=3001 npm start` (and `MOCK_PORT=4011` if 4010 is busy too).
+
 Run the tests:
 
 ```bash

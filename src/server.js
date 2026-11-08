@@ -17,8 +17,16 @@ async function resolveOperator() {
     if (!process.env.CAMARA_ACCESS_TOKEN) throw new Error('CAMARA_BASE_URL is set but CAMARA_ACCESS_TOKEN is not.');
     return { baseUrl: process.env.CAMARA_BASE_URL, accessToken: process.env.CAMARA_ACCESS_TOKEN, mock: false };
   }
-  await new Promise((resolve) => createMockOperator().listen(MOCK_PORT, resolve));
+  await new Promise((resolve) => createMockOperator().on('error', portError('MOCK_PORT', MOCK_PORT)).listen(MOCK_PORT, resolve));
   return { baseUrl: `http://localhost:${MOCK_PORT}/sim-swap/v1`, accessToken: 'mock-token', mock: true };
+}
+
+function portError(name, port) {
+  return (err) => {
+    if (err.code !== 'EADDRINUSE') throw err;
+    console.error(`\n  Port ${port} is already in use. Pick another one, e.g.\n\n    ${name}=${port + 1} npm start\n`);
+    process.exit(1);
+  };
 }
 
 const operator = await resolveOperator();
@@ -86,7 +94,7 @@ http.createServer(async (req, res) => {
     console.error(err);
     json(res, 500, { error: 'Internal error' });
   }
-}).listen(PORT, () => {
+}).on('error', portError('PORT', PORT)).listen(PORT, () => {
   console.log(`\n  SIM swap guard demo  ->  http://localhost:${PORT}`);
   console.log(`  Operator: ${operator.mock ? 'built-in mock' : 'real'} (${operator.baseUrl})\n`);
 });
