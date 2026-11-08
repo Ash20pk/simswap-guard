@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIM Swap Guard demo</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#5d6570; --line:#e2e5ea; --accent:#2457d6;
+          --allow:#137a3a; --step:#a35f00; --block:#b3261e; --review:#5b4bb7; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111317; --card:#1a1d23; --ink:#e9ebef; --muted:#9aa2ad; --line:#2b3039; --accent:#7aa2ff;
+            --allow:#4cc27a; --step:#f0a640; --block:#ff7a70; --review:#a99bff; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif }
+  main { max-width:560px; margin:40px auto; padding:0 16px }
+  h1 { font-size:22px; margin:0 0 4px } p.sub { color:var(--muted); margin:0 0 24px }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px }
+  h2 { font-size:15px; margin:0 0 12px }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px }
+  input, select { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font:inherit }
+  button { margin-top:14px; padding:9px 16px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer }
+  button:disabled { opacity:.45; cursor:not-allowed }
+  .result { margin-top:14px; padding:10px 12px; border-radius:6px; border-left:4px solid; background:var(--bg); display:none }
+  .result b { text-transform:uppercase; letter-spacing:.04em; font-size:12px }
+  .allow{border-color:var(--allow)} .allow b{color:var(--allow)}
+  .step_up{border-color:var(--step)} .step_up b{color:var(--step)}
+  .block{border-color:var(--block)} .block b{color:var(--block)}
+  .review{border-color:var(--review)} .review b{color:var(--review)}
+  .error{border-color:var(--block)}
+  code { font-size:13px }
+</style>
+</head>
+<body>
+<main>
+  <h1>SIM Swap Guard</h1>
+  <p class="sub">A mock bank that asks the mobile network whether the SIM changed recently before trusting a login or a payment.</p>
+
+  <section>
+    <h2>1. Log in</h2>
+    <label for="phone">Phone number</label>
+    <select id="phone"></select>
+    <label for="password">Password</label>
+    <input id="password" type="password" value="demo">
+    <button id="login">Log in</button>
+    <div class="result" id="loginResult"></div>
+  </section>
+
+  <section>
+    <h2>2. Send money</h2>
+    <label for="payee">Payee</label>
+    <input id="payee" value="Acme Ltd">
+    <label for="amount">Amount (blocked above 500 if the SIM changed in the last 72h)</label>
+    <input id="amount" type="number" value="750" min="1">
+    <button id="pay" disabled>Pay</button>
+    <div class="result" id="payResult"></div>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let token = null;
+
+  const ACTIONS = {
+    allow: 'Proceed.',
+    step_up: 'Re-verify with a passkey or app push. Do not send an SMS code to this number.',
+    block: 'Refused. Alert the customer through email or the app, not the phone.',
+    review: 'Held for manual review.',
+  };
+
+  function show(el, data, ok) {
+    el.style.display = 'block';
+    if (!ok && !data.decision) { el.className = 'result error'; el.textContent = data.error; return; }
+    el.className = 'result ' + data.decision;
+    el.innerHTML = '<b>' + data.decision.replace('_', ' ') + '</b><br>' + data.reason + '<br><small>' + ACTIONS[data.decision] + '</small>';
+  }
+
+  async function post(path, body, headers = {}) {
+    const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    return [res.ok, await res.json()];
+  }
+
+  fetch('/api/test-numbers').then((r) => r.json()).then((nums) => {
+    if (!nums.length) { $('phone').outerHTML = '<input id="phone" placeholder="+447700900001">'; return; }
+    $('phone').innerHTML = nums.map((n) => `<option value="${n.phoneNumber}">${n.phoneNumber}  ·  ${n.label}</option>`).join('');
+  });
+
+  $('login').onclick = async () => {
+    const [ok, data] = await post('/api/login', { phoneNumber: $('phone').value, password: $('password').value });
+    token = data.token ?? null;
+    $('pay').disabled = !token;
+    $('payResult').style.display = 'none';
+    show($('loginResult'), data, ok);
+  };
+
+  $('pay').onclick = async () => {
+    const [ok, data] = await post('/api/pay', { amount: $('amount').value, payee: $('payee').value }, { authorization: 'Bearer ' + token });
+    show($('payResult'), data, ok);
+  };
+</script>
+</body>
+</html>
