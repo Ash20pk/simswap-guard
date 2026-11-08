@@ -3,9 +3,8 @@
   "version": "0.1.0",
   "description": "Gate logins and payments on the CAMARA SIM Swap API. Zero dependencies, runs against a built-in mock operator.",
   "type": "module",
-  "main": "src/camara-client.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/dev-server.js",
     "mock": "node src/mock-operator.js",
     "test": "node --test"
   },

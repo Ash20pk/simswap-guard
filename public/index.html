@@ -79,7 +79,7 @@
     return [res.ok, await res.json()];
   }
 
-  fetch('/api/test-numbers').then((r) => r.json()).then((nums) => {
+  fetch('/api/demo-numbers').then((r) => r.json()).then((nums) => {
     if (!nums.length) { $('phone').outerHTML = '<input id="phone" placeholder="+447700900001">'; return; }
     $('phone').innerHTML = nums.map((n) => `<option value="${n.phoneNumber}">${n.phoneNumber}  ·  ${n.label}</option>`).join('');
   });

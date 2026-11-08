@@ -2,6 +2,12 @@
 
 **Stop account takeovers that start with a hijacked phone number.** A small, dependency-free Node app that checks the [CAMARA SIM Swap API](https://github.com/camaraproject/SimSwap) before it trusts a login or a payment. It runs against a built-in mock operator, so you can try it in under five minutes with no telco account.
 
+**▶ Live demo: [simswap-guard.vercel.app](https://simswap-guard.vercel.app)** (password `demo`)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAsh20pk%2Fsimswap-guard&env=SESSION_SECRET&envDescription=Any%20long%20random%20string%2C%20used%20to%20sign%20demo%20login%20tokens)
+
+Or run it locally:
+
 ```
 git clone https://github.com/Ash20pk/simswap-guard && cd simswap-guard && npm start
 ```
@@ -28,7 +34,7 @@ cd simswap-guard
 npm start
 ```
 
-Open **http://localhost:3000** and try these numbers (password: `demo`):
+Open **http://localhost:3000** (or the [live demo](https://simswap-guard.vercel.app)) and try these numbers (password: `demo`):
 
 | Number | What the mock operator says | Login | Pay 750 |
 |---|---|---|---|
@@ -40,7 +46,7 @@ Open **http://localhost:3000** and try these numbers (password: `demo`):
 
 The numbers come from Ofcom's range reserved for TV and film, so none of them can belong to a real person.
 
-Port taken? Run `PORT=3001 npm start` (and `MOCK_PORT=4011` if 4010 is busy too).
+Port taken? Run `PORT=3001 npm start`.
 
 Run the tests:
 
@@ -51,7 +57,7 @@ npm test
 ## How it works
 
 ```
- Browser ──► demo app (:3000) ──► policy.js ──► camara-client.js ──► operator (:4010)
+ Browser ──► demo bank (bank.js) ──► policy.js ──► camara-client.js ──► operator (mock or real)
                                      │                                  │
                          allow / step_up / block / review     POST /sim-swap/v1/check
                                                               { phoneNumber, maxAge }
@@ -63,7 +69,9 @@ npm test
 | [`src/policy.js`](src/policy.js) | **The part to copy.** Turns "SIM swapped?" into allow / step up / block / review. |
 | [`src/camara-client.js`](src/camara-client.js) | ~50-line client for `/check` and `/retrieve-date`. |
 | [`src/mock-operator.js`](src/mock-operator.js) | Mock operator with the CAMARA request, response and error shapes. |
-| [`src/server.js`](src/server.js) | The demo bank: login and payment endpoints. |
+| [`src/bank.js`](src/bank.js) | The demo bank: login and payment endpoints, as `(Request) → Response` handlers. |
+| [`src/dev-server.js`](src/dev-server.js) | Local server for `npm start`: the page, the bank API and the mock on one port. |
+| [`api/`](api) | The same handlers as Vercel functions. |
 
 ### The policy
 
@@ -82,25 +90,23 @@ The details that are easy to get wrong:
 
 ## Try the API directly
 
-Run the mock operator on its own:
+The mock operator is served alongside the demo, both locally and on the [live site](https://simswap-guard.vercel.app). Swap `localhost:3000` for `https://simswap-guard.vercel.app` to try it without cloning anything:
 
 ```bash
-npm run mock
-```
-
-```bash
-curl -s localhost:4010/sim-swap/v1/check \
+curl -s localhost:3000/sim-swap/v1/check \
   -H 'authorization: Bearer any' -H 'content-type: application/json' \
   -d '{"phoneNumber":"+447700900002","maxAge":24}'
 # {"swapped":true}
 
-curl -s localhost:4010/sim-swap/v1/retrieve-date \
+curl -s localhost:3000/sim-swap/v1/retrieve-date \
   -H 'authorization: Bearer any' -H 'content-type: application/json' \
   -d '{"phoneNumber":"+447700900002"}'
 # {"latestSimChange":"2026-11-09T08:14:03.120Z","monitoredPeriod":120}
 ```
 
 Errors use the CAMARA shape, `{ "status": 404, "code": "IDENTIFIER_NOT_FOUND", "message": "..." }`.
+
+`npm run mock` also runs the mock on its own, on port 4010.
 
 ## Point it at a real operator
 
@@ -112,7 +118,18 @@ CAMARA_ACCESS_TOKEN=<token> \
 npm start
 ```
 
-When `CAMARA_BASE_URL` is set, the mock is not started. How you get the token depends on the provider. CAMARA uses OAuth 2.0 (CIBA or authorization code flow), and access usually comes through an operator's developer portal or an aggregator such as GSMA Open Gateway partners. Check that your provider serves the `v1` path, and adjust the base URL if it doesn't.
+When `CAMARA_BASE_URL` is set, the demo uses it instead of the mock. On Vercel, add both as environment variables, plus `SESSION_SECRET` (any long random string) to sign login tokens. How you get the token depends on the provider. CAMARA uses OAuth 2.0 (CIBA or authorization code flow), and access usually comes through an operator's developer portal or an aggregator such as GSMA Open Gateway partners. Check that your provider serves the `v1` path, and adjust the base URL if it doesn't.
+
+## Deploy your own
+
+Click **Deploy with Vercel** above, or with the CLI:
+
+```bash
+vercel env add SESSION_SECRET production   # any long random string
+vercel deploy --prod
+```
+
+Everything runs on the free tier: a static page plus five small functions in [`api/`](api). There's no build step and nothing to install.
 
 ## Use it in your own app
 

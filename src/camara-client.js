@@ -11,13 +11,14 @@ export class CamaraError extends Error {
   }
 }
 
-export function createSimSwapClient({ baseUrl, accessToken, timeoutMs = 3000 }) {
+// fetchImpl lets you swap the transport, e.g. the in-process mock.
+export function createSimSwapClient({ baseUrl, accessToken, timeoutMs = 3000, fetchImpl = fetch }) {
   const root = baseUrl.replace(/\/$/, '');
 
   async function post(path, body) {
     let res;
     try {
-      res = await fetch(`${root}${path}`, {
+      res = await fetchImpl(`${root}${path}`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',

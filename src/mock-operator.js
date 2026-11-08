@@ -6,9 +6,13 @@
 //
 // The numbers below are from Ofcom's range reserved for drama/fiction
 // (+44 7700 900xxx), so they can never belong to a real subscriber.
+//
+// The core is a plain (Request) -> Response function, so the same mock runs
+// as a standalone server, in-process inside the demo, or as a serverless function.
 
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
+import { serve } from './node-adapter.js';
 
 const HOUR = 60 * 60 * 1000;
 const MONITORED_PERIOD_DAYS = 120;
@@ -24,76 +28,68 @@ export const SUBSCRIBERS = {
 
 const E164 = /^\+[1-9][0-9]{4,14}$/;
 
-function error(res, status, code, message, correlator) {
-  send(res, status, { status, code, message }, correlator);
-}
+/**
+ * @param {Request} request
+ * @param {{ action?: string, now?: () => number }} [opts]
+ *   action: 'check' | 'retrieve-date'. Defaults to the last segment of the URL path.
+ */
+export async function handleSimSwap(request, { action, now = Date.now } = {}) {
+  const correlator = request.headers.get('x-correlator');
+  const reply = (status, body) => {
+    const headers = { 'content-type': 'application/json' };
+    if (correlator) headers['x-correlator'] = correlator;
+    return new Response(JSON.stringify(body), { status, headers });
+  };
+  const error = (status, code, message) => reply(status, { status, code, message });
 
-function send(res, status, body, correlator) {
-  const headers = { 'content-type': 'application/json' };
-  if (correlator) headers['x-correlator'] = correlator;
-  res.writeHead(status, headers);
-  res.end(JSON.stringify(body));
-}
+  action ??= new URL(request.url).pathname.split('/').pop();
+  if (request.method !== 'POST' || !['check', 'retrieve-date'].includes(action)) {
+    return error(404, 'NOT_FOUND', 'The specified resource is not found.');
+  }
+  // Real operators issue tokens via OAuth2 (CIBA or authorization code).
+  // The mock only checks that one is present.
+  if (!/^Bearer \S+/.test(request.headers.get('authorization') ?? '')) {
+    return error(401, 'UNAUTHENTICATED', 'Request not authenticated due to missing, invalid, or expired credentials.');
+  }
 
-async function readJson(req) {
-  let raw = '';
-  for await (const chunk of req) raw += chunk;
-  return raw ? JSON.parse(raw) : {};
-}
+  let body;
+  try {
+    const raw = await request.text();
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    return error(400, 'INVALID_ARGUMENT', 'Request body is not valid JSON.');
+  }
 
-export function createMockOperator({ now = () => Date.now() } = {}) {
-  return http.createServer(async (req, res) => {
-    const correlator = req.headers['x-correlator'];
-    const route = req.url.split('?')[0];
+  const { phoneNumber, maxAge = 240 } = body ?? {};
+  if (typeof phoneNumber !== 'string' || !E164.test(phoneNumber)) {
+    return error(400, 'INVALID_ARGUMENT', 'phoneNumber must be in E.164 format, e.g. +447700900001.');
+  }
 
-    if (req.method !== 'POST' || !route.startsWith('/sim-swap/v1/')) {
-      return error(res, 404, 'NOT_FOUND', 'The specified resource is not found.', correlator);
+  const sub = SUBSCRIBERS[phoneNumber];
+  if (!sub) return error(404, 'IDENTIFIER_NOT_FOUND', 'Device identifier not found.');
+  if (sub.outage) return error(503, 'UNAVAILABLE', 'Service unavailable.');
+
+  const changedAt = sub.hoursAgo == null ? null : now() - sub.hoursAgo * HOUR;
+
+  if (action === 'check') {
+    if (!Number.isInteger(maxAge) || maxAge < 1 || maxAge > 2400) {
+      return error(400, 'OUT_OF_RANGE', 'maxAge must be an integer between 1 and 2400 hours.');
     }
-    // Real operators issue tokens via OAuth2 (CIBA or authorization code).
-    // The mock only checks that one is present.
-    if (!/^Bearer \S+/.test(req.headers.authorization ?? '')) {
-      return error(res, 401, 'UNAUTHENTICATED', 'Request not authenticated due to missing, invalid, or expired credentials.', correlator);
-    }
+    return reply(200, { swapped: changedAt != null && now() - changedAt <= maxAge * HOUR });
+  }
 
-    let body;
-    try {
-      body = await readJson(req);
-    } catch {
-      return error(res, 400, 'INVALID_ARGUMENT', 'Request body is not valid JSON.', correlator);
-    }
-
-    const { phoneNumber, maxAge = 240 } = body;
-    if (typeof phoneNumber !== 'string' || !E164.test(phoneNumber)) {
-      return error(res, 400, 'INVALID_ARGUMENT', 'phoneNumber must be in E.164 format, e.g. +447700900001.', correlator);
-    }
-
-    const sub = SUBSCRIBERS[phoneNumber];
-    if (!sub) {
-      return error(res, 404, 'IDENTIFIER_NOT_FOUND', 'Device identifier not found.', correlator);
-    }
-    if (sub.outage) {
-      return error(res, 503, 'UNAVAILABLE', 'Service unavailable.', correlator);
-    }
-
-    const changedAt = sub.hoursAgo == null ? null : new Date(now() - sub.hoursAgo * HOUR);
-
-    if (route === '/sim-swap/v1/check') {
-      if (!Number.isInteger(maxAge) || maxAge < 1 || maxAge > 2400) {
-        return error(res, 400, 'OUT_OF_RANGE', 'maxAge must be an integer between 1 and 2400 hours.', correlator);
-      }
-      const swapped = changedAt != null && now() - changedAt.getTime() <= maxAge * HOUR;
-      return send(res, 200, { swapped }, correlator);
-    }
-
-    if (route === '/sim-swap/v1/retrieve-date') {
-      return send(res, 200, {
-        latestSimChange: changedAt ? changedAt.toISOString() : null,
-        monitoredPeriod: MONITORED_PERIOD_DAYS,
-      }, correlator);
-    }
-
-    return error(res, 404, 'NOT_FOUND', 'The specified resource is not found.', correlator);
+  return reply(200, {
+    latestSimChange: changedAt == null ? null : new Date(changedAt).toISOString(),
+    monitoredPeriod: MONITORED_PERIOD_DAYS,
   });
+}
+
+/** A fetch() that answers from the mock without touching the network. */
+export const mockFetch = async (url, init) => handleSimSwap(new Request(url, init));
+
+/** The mock as a standalone HTTP server. */
+export function createMockOperator(opts) {
+  return http.createServer(serve((request) => handleSimSwap(request, opts)));
 }
 
 // `npm run mock` runs the operator on its own, so you can curl it.
