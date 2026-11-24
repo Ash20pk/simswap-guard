@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockOperator } from '../src/mock-operator.js';
 import { createSimSwapClient, CamaraError } from '../src/camara-client.js';
-import { assess } from '../src/policy.js';
+import { decide } from '../src/bank.js';
 
 let server, client;
 
@@ -48,8 +48,9 @@ const cases = [
   ['unknown number, payment', { action: 'payment', phoneNumber: '+15555550100', amount: 10 }, 'review'],
 ];
 
+// decide() runs the whole path: the policy's window, the (mock) operator, the policy's decision.
 for (const [name, input, expected] of cases) {
   test(`policy: ${name} -> ${expected}`, async () => {
-    assert.equal((await assess(client, input)).decision, expected);
+    assert.equal((await decide(input)).decision.result, expected);
   });
 }

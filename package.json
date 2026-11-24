@@ -1,12 +1,15 @@
 {
   "name": "simswap-guard",
   "version": "0.1.0",
-  "description": "Gate logins and payments on the CAMARA SIM Swap API. Zero dependencies, runs against a built-in mock operator.",
+  "description": "Gate logins and payments on the CAMARA SIM Swap API, with the decision in an OPA (Rego) policy. Zero npm dependencies, runs against a built-in mock operator.",
   "type": "module",
   "scripts": {
     "start": "node src/dev-server.js",
+    "sandbox": "node --env-file=.env src/dev-server.js",
     "mock": "node src/mock-operator.js",
-    "test": "node --test"
+    "test": "node --test",
+    "opa": "opa run --server --addr localhost:8181 policy/guard.rego policy/data.json",
+    "test:opa": "opa test policy/ -v"
   },
   "engines": {
     "node": ">=18"
