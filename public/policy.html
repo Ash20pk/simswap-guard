@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIM Swap Guard policy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .titlebar { padding: 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+  .titlebar h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .titlebar .grow { flex-grow: 1; display: flex; flex-direction: column; gap: 2px; }
+  .titlebar .sub { font: 12px var(--mono); color: var(--muted); }
+  .dirty { color: var(--step_up); font-weight: 600; }
+  .live { color: var(--allow); }
+  .token { height: 40px; padding: 0 10px; border: 1px solid var(--ink); width: 180px; font-family: var(--mono); font-size: 13px; }
+  .publish-msg { flex-basis: 100%; font-size: 13px; }
+
+  .rules { flex: 1 1 300px; }
+  .setting { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .setting-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .setting-head span:first-child { font-weight: 500; }
+  .setting-head .key { font: 11px var(--mono); color: var(--faint); }
+
+  .source { flex: 2 1 560px; }
+  .file-tabs { padding: 0 20px; display: flex; gap: 20px; border-bottom: 1px solid var(--line); align-items: flex-end; }
+  .file-tabs button { height: 44px; padding: 0; border: 0; background: none; font: 13px var(--mono); color: var(--faint); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .file-tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  .file-tabs .note { margin-left: auto; padding: 12px 0; }
+  .code { flex-grow: 1; min-height: 480px; overflow: auto; padding: 14px 0; background: var(--code-bg); font: 13px/1.7 var(--mono); }
+  .ln { display: flex; gap: 16px; min-height: 22px; width: max-content; min-width: 100%; padding-right: 20px; }
+  .ln.changed { background: #FFF1D6; box-shadow: inset 3px 0 0 var(--step_up); }
+  .ln .n { flex: 0 0 44px; text-align: right; color: #ABABAB; user-select: none; }
+  .ln .c { white-space: pre; }
+  .tk-kw { font-weight: 600; }
+  .tk-str { color: #0E6B5C; }
+  .tk-num { color: var(--step_up); }
+  .tk-com { color: var(--faint); font-style: italic; }
+
+  .try { flex: 1 1 380px; }
+  .try-controls { padding: 0 20px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .try-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .try-row .seg { flex: 1 1 140px; }
+  .nums { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); border: 1px solid var(--ink); }
+  .nums button { min-height: 44px; padding: 4px 6px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--paper); font: 12px var(--mono); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+  .nums button small { font: 10.5px var(--sans); color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nums button[aria-checked="true"] { background: var(--ink); color: var(--paper); }
+  .nums button[aria-checked="true"] small { color: #BDBDBD; }
+  .block-sec { border-top: 1px solid var(--line); padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .block-sec pre { font: 12.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .trace-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; font: 12.5px var(--mono); }
+  .off { color: var(--faint); }
+  .result { margin-top: auto; border-top: 1px solid var(--ink); padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .result .big-result { font-size: 40px; }
+  .result pre { padding: 12px 14px; background: var(--ink); color: #EDEDED; font: 12.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="brand">SIM Swap Guard</span>
+  <nav class="nav" aria-label="Sections">
+    <a href="/">Console</a>
+    <a href="/policy" aria-current="page">Policy</a>
+  </nav>
+  <span class="status" id="policy-status"></span>
+  <span class="status" id="operator"></span>
+</header>
+
+<div class="titlebar">
+  <div class="grow">
+    <h1>Decision policy</h1>
+    <span class="sub">data.simswap.guard.decision · <span id="rev"></span></span>
+  </div>
+  <input class="token" id="token" type="password" placeholder="Admin token" aria-label="Admin token" hidden>
+  <button class="btn" id="discard" type="button" disabled>Discard</button>
+  <button class="btn primary" id="publish" type="button" disabled>Publish</button>
+  <div class="publish-msg" id="publish-msg" role="status"></div>
+</div>
+
+<main class="columns">
+  <section class="col rules" aria-labelledby="rules-h">
+    <div class="col-head"><h2 class="label" id="rules-h">Thresholds</h2></div>
+    <div id="settings"></div>
+  </section>
+
+  <section class="col source" aria-labelledby="src-h">
+    <h2 class="visually-hidden" id="src-h">Policy source</h2>
+    <div class="file-tabs">
+      <div role="tablist" aria-label="Files" style="display: flex; gap: 20px">
+        <button type="button" role="tab" id="tab-rego" aria-selected="true">guard.rego</button>
+        <button type="button" role="tab" id="tab-data" aria-selected="false">data.json</button>
+      </div>
+      <span class="note" id="file-note"></span>
+    </div>
+    <div class="code" id="code"></div>
+  </section>
+
+  <section class="col try" aria-labelledby="try-h">
+    <div class="col-head">
+      <h2 class="label" id="try-h">Try it</h2>
+      <span class="mono note" id="try-target"></span>
+    </div>
+    <div class="try-controls">
+      <div class="nums" role="radiogroup" aria-label="Subscriber" id="nums"></div>
+      <div class="try-row">
+        <div class="seg mono" role="radiogroup" aria-label="Action" id="actions"></div>
+        <div class="seg mono" role="radiogroup" aria-label="Amount" id="amounts"></div>
+      </div>
+    </div>
+    <div class="block-sec"><span class="note">input</span><pre id="input"></pre></div>
+    <div class="block-sec"><span class="note">trace</span><div id="trace"></div></div>
+    <div class="result" id="result" aria-live="polite"></div>
+  </section>
+</main>
+
+<script type="module">
+import { $, h, api, loadStatus, RESULT_LABEL } from '/common.js';
+
+const SETTINGS = [
+  { label: 'Login window', key: 'windows.login', options: [12, 24, 48], fmt: (v) => `${v}h`, help: 'How far back a SIM change makes a login suspicious.' },
+  { label: 'Payment window', key: 'windows.payment', options: [72, 192, 240], fmt: (v) => `${v}h`, help: 'The Orange sandbox dates swaps exactly 168h back, so only a window over 168h catches them.' },
+  { label: 'Block payments above', key: 'block_above', options: [250, 500, 1000], fmt: (v) => `£${v}`, help: 'Below this, a recent swap means step up instead of block.' },
+  { label: 'Operator down, login', key: 'on_error.login', options: ['allow', 'step_up'], fmt: (v) => v, help: 'Blocking every login during an outage costs more than the risk.' },
+  { label: 'Operator down, payment', key: 'on_error.payment', options: ['review', 'block'], fmt: (v) => v, help: 'Money moving: hold it rather than guess.' },
+];
+
+const state = { policy: null, live: null, draft: null, rev: 1, file: 'rego', numbers: [], phone: '', action: 'payment', amount: 750, evalSeq: 0 };
+
+const get = (obj, key) => key.split('.').reduce((o, k) => o?.[k], obj);
+const set = (obj, key, v) => { const ks = key.split('.'); const last = ks.pop(); ks.reduce((o, k) => o[k], obj)[last] = v; };
+const isDirty = () => JSON.stringify(state.draft) !== JSON.stringify(state.live);
+const asData = (cfg) => JSON.stringify({ simswap: { config: cfg } }, null, 2);
+
+function renderHeader() {
+  const dirty = isDirty();
+  $('#rev').replaceChildren(dirty ? h('span', { class: 'dirty' }, 'unpublished changes')
+    : state.rev ? h('span', { class: 'live' }, `rev ${state.rev} · live`) : h('span', { class: 'dirty' }, 'engine unreachable'));
+  $('#discard').disabled = !dirty;
+  $('#publish').disabled = !dirty;
+  $('#publish').textContent = state.policy.engine === 'opa' ? 'Publish to OPA' : 'Publish';
+  $('#token').hidden = !state.policy.publishNeedsToken;
+}
+
+function renderSettings() {
+  $('#settings').replaceChildren(...SETTINGS.map((s) => {
+    const current = get(state.draft, s.key);
+    const options = s.options.includes(current) ? s.options : [...s.options, current];
+    return h('div', { class: 'setting' },
+      h('div', { class: 'setting-head' }, h('span', {}, s.label), h('span', { class: 'key' }, s.key)),
+      h('div', { class: 'seg', role: 'radiogroup', 'aria-label': s.label }, options.map((v) => h('button', {
+        type: 'button', role: 'radio', 'aria-checked': String(v === current),
+        onclick: () => { set(state.draft, s.key, v); renderAll(); evaluate(); },
+      }, s.fmt(v)))),
+      h('span', { class: 'note' }, s.help));
+  }));
+}
+
+const KW = new Set(['package', 'import', 'default', 'if', 'not', 'in', 'some', 'every', 'contains']);
+function tokens(line, rego) {
+  if (rego && line.trim().startsWith('#')) return [h('span', { class: 'tk-com' }, line)];
+  return line.split(/("[^"]*"|\b[a-z_]+\b|\b\d+\b)/).filter(Boolean).map((p) => {
+    const cls = p[0] === '"' ? 'tk-str' : /^\d+$/.test(p) ? 'tk-num' : rego && KW.has(p) ? 'tk-kw' : null;
+    return cls ? h('span', { class: cls }, p) : p;
+  });
+}
+
+function renderCode() {
+  const rego = state.file === 'rego';
+  $('#tab-rego').setAttribute('aria-selected', String(rego));
+  $('#tab-data').setAttribute('aria-selected', String(!rego));
+  const lines = (rego ? state.policy.rego.replace(/\n$/, '') : asData(state.draft)).split('\n');
+  const liveLines = asData(state.live).split('\n');
+  $('#code').replaceChildren(...lines.map((line, i) => h('div', { class: `ln${!rego && line !== liveLines[i] ? ' changed' : ''}` },
+    h('span', { class: 'n' }, String(i + 1)),
+    h('span', { class: 'c' }, ...tokens(line.replace(/\t/g, '    '), rego)))));
+  $('#file-note').textContent = rego ? 'Rules change through code review'
+    : isDirty() ? 'Highlighted lines differ from live' : 'Matches what the engine is serving';
+}
+
+function renderTryControls() {
+  $('#nums').replaceChildren(...state.numbers.map((n) => h('button', {
+    type: 'button', role: 'radio', 'aria-checked': String(n.phoneNumber === state.phone), title: `${n.phoneNumber}: ${n.label}`,
+    onclick: () => { state.phone = n.phoneNumber; renderTryControls(); evaluate(); },
+  }, `…${n.phoneNumber.slice(-4)}`, h('small', {}, n.label))));
+  $('#actions').replaceChildren(...['login', 'payment'].map((a) => h('button', {
+    type: 'button', role: 'radio', 'aria-checked': String(a === state.action),
+    onclick: () => { state.action = a; renderTryControls(); evaluate(); },
+  }, a)));
+  const pay = state.action === 'payment';
+  $('#amounts').replaceChildren(...[200, 750, 2500].map((v) => h('button', {
+    type: 'button', role: 'radio', disabled: !pay, 'aria-checked': String(pay && v === state.amount),
+    onclick: () => { state.amount = v; renderTryControls(); evaluate(); },
+  }, `£${v}`)));
+}
+
+function renderResult(data) {
+  if (data.error) {
+    $('#input').textContent = '';
+    $('#trace').replaceChildren();
+    $('#result').replaceChildren(h('span', { class: 'error-text' }, data.error));
+    return;
+  }
+  $('#input').textContent = JSON.stringify(data.input, null, 2);
+  const bool = (name) => {
+    const on = data.rules[name] === true;
+    return h('div', { class: 'trace-row' }, h('span', {}, name), h('span', { class: on ? '' : 'off' }, String(on)));
+  };
+  const s = data.structured;
+  const fellBack = data.trace.find((e) => e.kind === 'policy' && e.text.startsWith('OPA failed'));
+  $('#trace').replaceChildren(
+    h('div', { class: 'trace-row' }, h('span', {}, 'window_hours'), h('span', { class: 'r-step_up' }, String(data.rules.window_hours))),
+    bool('operator_down'), bool('recent_swap'), bool('large_payment'),
+    h('div', { class: 'trace-row' }, h('span', {}, 'decision ←'), h('span', { class: `r-${s.result}`, style: 'font-weight: 600' }, s.rule)),
+    fellBack ? h('div', { class: 'error-text' }, fellBack.text) : '');
+  const op = data.trace.find((e) => e.label === 'operator');
+  const structured = { ...s, policy_rev: data.draft ? `${state.rev + 1}-draft` : String(state.rev) };
+  $('#result').replaceChildren(
+    h('div', { style: 'display: flex; align-items: baseline; justify-content: space-between; gap: 12px' },
+      h('span', { class: `big-result r-${s.result}` }, RESULT_LABEL[s.result]),
+      h('span', { class: 'mono note' }, op ? `operator ${op.status} in ${op.ms}ms` : '')),
+    h('pre', {}, JSON.stringify(structured, null, 2)));
+}
+
+async function evaluate() {
+  if (!state.phone) return;
+  const seq = ++state.evalSeq;
+  $('#result').style.opacity = '0.5';
+  const { data } = await api('/api/policy/evaluate', {
+    method: 'POST',
+    body: { action: state.action, phoneNumber: state.phone, amount: state.amount, config: isDirty() ? state.draft : undefined },
+  });
+  if (seq !== state.evalSeq) return; // a newer evaluation is on its way
+  $('#result').style.opacity = '';
+  renderResult(data);
+}
+
+function renderAll() { renderHeader(); renderSettings(); renderCode(); }
+
+$('#tab-rego').onclick = () => { state.file = 'rego'; renderCode(); };
+$('#tab-data').onclick = () => { state.file = 'data'; renderCode(); };
+$('#discard').onclick = () => { state.draft = structuredClone(state.live); $('#publish-msg').textContent = ''; renderAll(); evaluate(); };
+$('#publish').onclick = async () => {
+  $('#publish').disabled = true;
+  const { ok, data } = await api('/api/policy', { method: 'PUT', body: { config: state.draft }, headers: { 'x-admin-token': $('#token').value } });
+  if (!ok) {
+    $('#publish-msg').replaceChildren(h('span', { class: 'error-text' }, data.error ?? 'Publishing failed.'));
+    renderHeader();
+    return;
+  }
+  state.live = data.config; state.draft = structuredClone(data.config); state.rev = data.rev;
+  $('#publish-msg').replaceChildren(h('span', { class: 'live' }, `Published rev ${data.rev}. New logins and payments use it now.`));
+  renderAll(); loadStatus(); evaluate();
+};
+
+const [{ data: policy }, { data: numbers }] = await Promise.all([api('/api/policy'), api('/api/demo-numbers'), loadStatus()]);
+state.policy = policy;
+state.live = policy.config;
+state.draft = structuredClone(policy.config);
+state.rev = policy.rev;
+state.numbers = Array.isArray(numbers) ? numbers : [];
+state.phone = state.numbers[1]?.phoneNumber ?? state.numbers[0]?.phoneNumber ?? '';
+$('#try-target').textContent = policy.engine === 'opa' ? 'POST /v1/data/simswap/guard' : 'built-in evaluator';
+if (policy.engineError) $('#publish-msg').replaceChildren(h('span', { class: 'error-text' }, policy.engineError));
+renderAll();
+renderTryControls();
+evaluate();
+</script>
+</body>
+</html>
