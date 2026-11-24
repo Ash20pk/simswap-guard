@@ -13,10 +13,41 @@
 import { readFileSync } from 'node:fs';
 
 export const REGO_SOURCE = readFileSync(new URL('../policy/guard.rego', import.meta.url), 'utf8');
-export const DEFAULT_CONFIG = JSON.parse(readFileSync(new URL('../policy/data.json', import.meta.url), 'utf8')).simswap.config;
+const FILE_CONFIG = JSON.parse(readFileSync(new URL('../policy/data.json', import.meta.url), 'utf8')).simswap.config;
 
 export const ACTIONS = ['login', 'payment'];
 const RESULTS = ['allow', 'step_up', 'review', 'block'];
+
+/**
+ * Lays a deployment's POLICY_CONFIG (JSON, any subset of data.json's config)
+ * over the file's thresholds. Operator sandboxes date their swaps differently:
+ * Orange's dates every swap 168h back, so it needs windows over 168h while the
+ * mock's 2h and 50h swaps suit 24h and 72h. Throws if the result is invalid,
+ * so a bad value stops the server at startup rather than skewing decisions.
+ */
+export function applyOverride(base, raw) {
+  if (!raw || !raw.trim()) return base;
+  let over;
+  try {
+    over = JSON.parse(raw);
+  } catch {
+    throw new Error('POLICY_CONFIG is not valid JSON.');
+  }
+  if (!over || typeof over !== 'object' || Array.isArray(over)) throw new Error('POLICY_CONFIG must be a JSON object.');
+  const merged = {
+    ...base, ...over,
+    windows: { ...base.windows, ...over.windows },
+    on_error: { ...base.on_error, ...over.on_error },
+  };
+  try {
+    return validateConfig(merged);
+  } catch (err) {
+    throw new Error(`POLICY_CONFIG: ${err.message}`);
+  }
+}
+
+/** The thresholds this deployment starts with: policy/data.json, then POLICY_CONFIG on top. */
+export const DEFAULT_CONFIG = applyOverride(FILE_CONFIG, process.env.POLICY_CONFIG);
 
 /** Checks a config edited on the policy page and returns a clean copy. Throws with a readable message. */
 export function validateConfig(c) {
