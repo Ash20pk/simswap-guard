@@ -1,0 +1,9 @@
+{
+  "simswap": {
+    "config": {
+      "windows": { "login": 24, "payment": 72 },
+      "block_above": 500,
+      "on_error": { "login": "allow", "payment": "review" }
+    }
+  }
+}
