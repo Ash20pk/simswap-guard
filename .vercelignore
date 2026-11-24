@@ -1,0 +1,6 @@
+# Never upload local secrets with `vercel deploy`.
+.env
+.env.*
+# Not needed at runtime.
+test/
+.github/
