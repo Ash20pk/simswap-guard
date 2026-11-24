@@ -137,7 +137,13 @@ Publishing changes decisions for everyone, so:
 
 With the built-in engine, published thresholds live in memory: they reset on restart, and on Vercel each function instance keeps its own. Use OPA when they need to stick.
 
-**The Orange sandbox needs a longer payment window.** Orange's sandbox dates every recent swap exactly 168 hours back, and a 168h window does not include that instant. Publish 192h or 240h to see its swapped numbers caught.
+**The Orange sandbox needs longer windows.** Orange's sandbox dates every recent swap exactly 168 hours back, and a 168h window does not include that instant, so with the default 24h and 72h windows Orange answers `swapped: false` for every number and everything is allowed. Set the windows for that deployment with `POLICY_CONFIG`, which lays any part of `data.json`'s config over the file:
+
+```bash
+POLICY_CONFIG='{"windows":{"login":192,"payment":192}}' npm run sandbox
+```
+
+It is checked at startup, and a bad value stops the server rather than skewing decisions. It sets the built-in engine's starting thresholds (and OPA's fallback); an OPA server reads its own `data.json`.
 
 ## Try the API directly
 
@@ -196,7 +202,7 @@ vercel env add SESSION_SECRET production   # any long random string
 vercel deploy --prod
 ```
 
-Everything runs on the free tier: two static pages plus a few small functions in [`api/`](api). There's no build step and nothing to install. The deployment uses the built-in policy engine unless you set `OPA_URL` to an OPA the functions can reach. To allow publishing from the policy page, also set `POLICY_ADMIN_TOKEN`.
+Everything runs on the free tier: two static pages plus a few small functions in [`api/`](api). There's no build step and nothing to install. The deployment uses the built-in policy engine unless you set `OPA_URL` to an OPA the functions can reach. To allow publishing from the policy page, also set `POLICY_ADMIN_TOKEN`. Pointing it at an operator sandbox? Set `POLICY_CONFIG` too (see the Orange note above).
 
 ## Use it in your own app
 

@@ -54,3 +54,18 @@ for (const [name, input, expected] of cases) {
     assert.equal((await decide(input)).decision.result, expected);
   });
 }
+
+test('POLICY_CONFIG overrides part of data.json and is validated', async () => {
+  const { applyOverride, DEFAULT_CONFIG } = await import('../src/policy.js');
+  const base = DEFAULT_CONFIG;
+  assert.equal(applyOverride(base, undefined), base);
+  assert.equal(applyOverride(base, '  '), base);
+  const over = applyOverride(base, '{"windows":{"payment":192}}');
+  assert.deepEqual(over.windows, { login: base.windows.login, payment: 192 });
+  assert.equal(over.block_above, base.block_above);
+  assert.deepEqual(over.on_error, base.on_error);
+  assert.equal(applyOverride(base, '{"on_error":{"login":"step_up"}}').on_error.payment, base.on_error.payment);
+  assert.throws(() => applyOverride(base, '{windows'), /not valid JSON/);
+  assert.throws(() => applyOverride(base, '[1]'), /must be a JSON object/);
+  assert.throws(() => applyOverride(base, '{"windows":{"login":0}}'), /POLICY_CONFIG: windows.login/);
+});
