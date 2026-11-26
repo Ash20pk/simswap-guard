@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/dev-server.js",
     "sandbox": "node --env-file=.env src/dev-server.js",
+    "demo": "node --env-file-if-exists=.env src/demo.js",
     "mock": "node src/mock-operator.js",
     "test": "node --test",
     "opa": "opa run --server --addr localhost:8181 policy/guard.rego policy/data.json",

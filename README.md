@@ -122,6 +122,14 @@ The rules live in [`policy/guard.rego`](policy/guard.rego). Two engines can eval
 To run with OPA locally ([install OPA](https://www.openpolicyagent.org/docs#running-opa) first):
 
 ```bash
+npm run demo
+```
+
+That starts OPA on :8181 with `guard.rego` and this deployment's thresholds loaded, then the app pointed at it, and Ctrl+C stops both. It reads `.env` if there is one, so with operator credentials and `POLICY_CONFIG` there (see below) it is the whole sandbox demo in one command. `OPA_PORT` moves OPA if 8181 is taken. Without the `opa` binary it says so and runs the built-in engine. It needs Node 22.9 or newer.
+
+Or run the two yourself:
+
+```bash
 npm run opa                                  # OPA on :8181 with guard.rego and data.json loaded
 OPA_URL=http://localhost:8181 npm start      # in another terminal
 ```
@@ -143,7 +151,7 @@ With the built-in engine, published thresholds live in memory: they reset on res
 POLICY_CONFIG='{"windows":{"login":192,"payment":192}}' npm run sandbox
 ```
 
-It is checked at startup, and a bad value stops the server rather than skewing decisions. It sets the built-in engine's starting thresholds (and OPA's fallback); an OPA server reads its own `data.json`.
+Or put the same line in `.env`, where `npm run sandbox` and `npm run demo` pick it up. It is checked at startup, and a bad value stops the server rather than skewing decisions. It sets the built-in engine's starting thresholds and OPA's fallback. `npm run demo` also loads it into the OPA it starts; an OPA you run yourself reads its own `data.json`.
 
 ## Try the API directly
 
